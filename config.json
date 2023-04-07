@@ -1,8 +1,0 @@
-{
-  "bot": {
-    "token": "Paste token here"
-  },
-  "openai": {
-    "token": "Paste token here"
-  }
-}

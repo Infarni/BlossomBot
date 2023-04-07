@@ -1,23 +1,35 @@
 #!/bin/env python3
-
-import ujson
+import os
 import logging
 
-from aiogram import Bot, Dispatcher, executor, types
+import asyncio
+import aioschedule
+import openai
 
-from handlers.chatgpt import get_stream
+from dotenv import dotenv_values
+
+from aiogram import Bot, Dispatcher, executor, types
+from aiogram.utils.callback_data import CallbackData
+
+from handlers import AI
 
 
 logging.basicConfig(level=logging.INFO)
+config = dotenv_values()
+openai.api_key = config['OPENAI_TOKEN']
 
-with open('config.json', 'r') as file:
-    config = ujson.loads(file.read())
-
-
-bot = Bot(token=config['bot']['token'], parse_mode='html')
+bot = Bot(token=config['TELEGRAM_BOT_TOKEN'], parse_mode='html')
+bot.users = {}
 dp = Dispatcher(bot)
 
-chatgpt_users_messages = {}
+
+class User(AI.OpenAI, AI.Tesseract):
+    def __init__(self, ai: str, lang_code: str):
+        super().__init__(lang_code)
+        self.ai = ai
+
+    def __eq__(self, value):
+        return self.ai == value
 
 
 @dp.message_handler(commands=['start'])
@@ -29,56 +41,167 @@ async def start(message: types.Message):
 
 @dp.message_handler(commands=['help'])
 async def help(message: types.Message):
-    text = '''Тут поки пустовато але працюють пару команд, наприклад:
-    /start - Запуск бота.
-    /help - Отримати інструкції по використанню бота.
-    /chatgpt {request} - Спілкування з ChatGPT.'''
+    text = '''
+Тут поки пустовато але працюють пару команд, наприклад:
+/start - Запуск бота.
+/help - Отримати інструкції по використанню бота.
+/select - Вибрати нейрону мережу
+'''
     
     await bot.send_message(message.from_id, text)
 
 
-@dp.message_handler(commands=['chatgpt'])
-async def chat_gpt(message: types.Message):
-    user_id = message.from_user.id
-    if user_id not in chatgpt_users_messages.keys():
-        chatgpt_users_messages[user_id] = []
+@dp.message_handler(commands=['select'])
+async def select(message: types.Message):
+    markup = types.InlineKeyboardMarkup().add(
+        types.InlineKeyboardButton(
+            text='chatgpt',
+            callback_data='chatgpt'
+        ),
+        types.InlineKeyboardButton(
+            text='dall-e',
+            callback_data='dall-e'
+        ),
+        types.InlineKeyboardButton(
+            text='tesseract',
+            callback_data='tesseract'
+        )
+    )
     
-    if len(chatgpt_users_messages[user_id]) > 30:
-        del chatgpt_users_messages[user_id][0:20]
+    text = 'Виберіть нейрону мережу'
+    await bot.send_message(message.from_id, text, reply_markup=markup)
 
-    alert = await bot.send_message(message.from_id, 'Завантаження...')
 
-    message_text = message.text.split(' ')[-1]
+@dp.callback_query_handler(lambda call: call.data == 'chatgpt')
+async def chatgpt_callback_query(call: types.CallbackQuery):
+    user_id = call.from_user.id
+    if not bot.users.get(user_id):
+        bot.users[user_id] = User('chatgpt', call.from_user.language_code)
+    else:
+        bot.users[user_id].ai = 'chatgpt'
+
+    await bot.answer_callback_query(call.id)
+
+    text = 'Ви вибрали chatgpt. Пишіть в цей чат для взаємодії.'
+    await bot.send_message(user_id, text)
+
+
+@dp.callback_query_handler(lambda call: call.data == 'dall-e')
+async def dalle_callback_query(call: types.CallbackQuery):
+    user_id = call.from_user.id
+    if not bot.users.get(user_id):
+        bot.users[user_id] = User('dall-e', call.from_user.language_code)
+    else:
+        bot.users[user_id].ai = 'dall-e'
+
+    await bot.answer_callback_query(call.id)
+
+    text = '''
+Ви вибрали dall-e. Пишіть в цей чат для взаємодії.
+\n\nМайте на увазі що dall-e потребує великий prompt для генерації чогось конкретного
+'''
+    await bot.send_message(user_id, text)
+
+
+@dp.callback_query_handler(lambda call: call.data == 'tesseract')
+async def tesseract_callback_query(call: types.CallbackQuery):
+    user_id = call.from_user.id
+    if not bot.users.get(user_id):
+        bot.users[user_id] = User('tesseract', call.from_user.language_code)
+    else:
+        bot.users[user_id].ai = 'tesseract'
+
+    await bot.answer_callback_query(call.id)
+
+    text = '''
+Ви вибрали tesseract. Відішліть в цей чат для взаємодії.
+(Тимчасово доступна тільки Українська мова)
+'''
+    await bot.send_message(user_id, text)
+
+
+@dp.message_handler(
+    lambda message: bot.users.get(message.from_user.id) == 'chatgpt',
+    content_types=['text']
+)
+async def chatgpt(message: types.Message):
+    user = bot.users[message.from_user.id]
     
-    chatgpt_users_messages[user_id].append({'role': 'user', 'content': message_text})
-
-    stream = get_stream(config, chatgpt_users_messages[user_id])
+    info = await message.reply('Завантаження...')
     
-    full_text = ''
-    event_text = ''
-    for index, event in enumerate(stream):
-        if index != 0 and event.data != '[DONE]':
-            data = ujson.loads(event.data)['choices'][0]
+    text = ''
+    try:
+        for sym in user.chatgpt(message.text):
+            text += sym
             
-            if data['finish_reason'] != 'stop':
-                event_text += data['delta']['content']
+            if '\n' in sym:
+                await bot.send_message(message.from_id, text)
                 
-                if event_text[-2:] == '\n\n':
-                    await alert.delete()
-                    await bot.send_message(message.from_id, event_text)
-                    
-                    full_text += event_text
-                    event_text = ''
-                    
-                    alert = await bot.send_message(message.from_id, 'Завантаження...')
-            else:
-                await alert.delete()
-                await bot.send_message(message.from_id, event_text)
+                await info.delete()
+                info = await message.reply('Завантаження...')
                 
-                full_text += event_text
-    
-    chatgpt_users_messages[user_id].append({'role': 'assistant', 'content': full_text})
+                text = ''
+        
+        await bot.send_message(message.from_id, text)
+        await info.delete()
+    except:
+        await bot.send_message(message.from_id, 'Щось сталось не так...')
+        await info.delete()
+
+
+@dp.message_handler(
+    lambda message: bot.users.get(message.from_user.id) == 'dall-e',
+    content_types=['text']
+)
+async def dalle(message: types.Message):
+    user = bot.users[message.from_user.id]
+        
+    info = await bot.send_message(message.from_id, 'Завантаження...')
+    try:
+        image_url = user.dalle(message.text)
+    except:
+        await info.delete()
+        await bot.send_message(message.from_id, 'Щось сталось не так...')        
+        
+        return
+
+    await bot.send_photo(message.from_id, image_url)
+    await info.delete()
+
+
+@dp.message_handler(
+    lambda message: bot.users.get(message.from_user.id) == 'tesseract',
+    content_types=['photo'],
+)
+async def tesseract(message: types.Message):
+    user = bot.users[message.from_user.id]
+        
+    info = await bot.send_message(message.from_id, 'Завантаження...')
+    try:
+        file = await bot.get_file(message.photo[-1].file_id)
+        image_url = f'https://api.telegram.org/file/bot{bot._token}/{file.file_path}'
+        text = user.scan(image_url)
+    except:
+        await info.delete()
+        await bot.send_message(message.from_id, 'Щось сталось не так...')        
+        
+        return
+
+    await bot.send_message(message.from_id, text)
+    await info.delete()
+
+
+@dp.message_handler()
+async def chat(message: types.Message):
+    text = 'Ви не вибрали нейрону мережу'
+    await bot.send_message(message.from_id, text)
 
 
 if __name__ == '__main__':
-    executor.start_polling(dp, skip_updates=True, timeout=0, relax=0, loop=True)
+    executor.start_polling(
+        dp,
+        skip_updates=True,
+        timeout=0,
+        relax=0,
+        loop=True,
+    )
