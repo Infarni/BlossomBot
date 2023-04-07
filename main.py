@@ -174,9 +174,14 @@ async def dalle(message: types.Message):
             
             return
 
-        image_url = user.dalle(message.text)
+        image_url = user.dalle(prompt=message.text)
     except:
-        await bot.send_message(message.from_id, 'Зображення має бути квадратним та меньшим 4MB')        
+        if message.content_type == 'photo':
+            text = 'Зображення має бути квадратним та меньшим 4MB'
+        else:
+            text = 'Щось пішло не так...'
+
+        await bot.send_message(message.from_id, text)
         await info.delete()
         
         return
