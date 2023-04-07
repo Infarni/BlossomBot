@@ -104,7 +104,7 @@ class OpenAI:
                 n=1,
             )
             
-            # os.remove(image_path)
+            os.remove(image_path)
             
             return image.data[0]['url']
 
