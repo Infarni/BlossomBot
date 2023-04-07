@@ -26,7 +26,6 @@ dp = Dispatcher(bot)
 class User(
     AI.OpenAI,
     AI.Tesseract,
-    AI.NotionAI
 ):
     def __init__(self, ai: str, lang_code: str):
         super().__init__(lang_code)
