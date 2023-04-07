@@ -162,24 +162,24 @@ async def dalle(message: types.Message):
         
     info = await message.reply('Завантаження...')
             
-    # try:
-    if message.content_type == 'photo':
-        file = await bot.get_file(message.photo[-1].file_id)
-        image_url = f'https://api.telegram.org/file/bot{bot._token}/{file.file_path}'
+    try:
+        if message.content_type == 'photo':
+            file = await bot.get_file(message.photo[-1].file_id)
+            image_url = f'https://api.telegram.org/file/bot{bot._token}/{file.file_path}'
 
-        variation_image_url = user.dalle(image_url=image_url)
+            variation_image_url = user.dalle(image_url=image_url)
             
-        await bot.send_photo(message.from_id, variation_image_url)
+            await bot.send_photo(message.from_id, variation_image_url)
+            await info.delete()
+            
+            return
+
+        image_url = user.dalle(message.text)
+    except:
+        await bot.send_message(message.from_id, 'Зображення має бути квадратним та меньшим 4MB')        
         await info.delete()
-            
-        return
-
-    image_url = user.dalle(message.text)
-    # except:
-    #     await bot.send_message(message.from_id, 'Зображення має бути квадратним та меньшим 4MB')        
-    #     await info.delete()
         
-    #     return
+        return
 
     await bot.send_photo(message.from_id, image_url)
     await info.delete()
