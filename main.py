@@ -155,17 +155,29 @@ async def chatgpt(message: types.Message):
 
 @dp.message_handler(
     lambda message: bot.users.get(message.from_user.id) == 'dall-e',
-    content_types=['text']
+    content_types=['text', 'photo']
 )
 async def dalle(message: types.Message):
     user = bot.users[message.from_user.id]
         
-    info = await bot.send_message(message.from_id, 'Завантаження...')
+    info = await message.reply('Завантаження...')
+            
     try:
+        if message.content_type == 'photo':
+            file = await bot.get_file(message.photo[-1].file_id)
+            image_url = f'https://api.telegram.org/file/bot{bot._token}/{file.file_path}'
+
+            variation_image_url = user.dalle(image_url=image_url)
+            
+            await bot.send_photo(message.from_id, variation_image_url)
+            await info.delete()
+            
+            return
+
         image_url = user.dalle(message.text)
     except:
+        await bot.send_message(message.from_id, 'Зображення має бути квадратним та меньшим 4MB')        
         await info.delete()
-        await bot.send_message(message.from_id, 'Щось сталось не так...')        
         
         return
 

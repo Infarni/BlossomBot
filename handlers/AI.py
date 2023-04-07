@@ -73,7 +73,21 @@ class OpenAI:
                 self.messages[-1]['content'] += content
                 yield content
 
-    def dalle(self, prompt, image_file=None):
+    def dalle(self, prompt='', image_url=None):
+        if image_url:
+            response = requests.get(image_url)
+            image_path = rf'''media/{image_url.split('/')[-1]}.png'''
+            image_file = Image.open(BytesIO(response.content)).save(image_path)
+            
+            image = openai.Image.create_variation(
+                image=open(image_path, 'rb'),
+                n=1,
+            )
+            
+            os.remove(image_path)
+            
+            return image.data[0]['url']
+
         image = openai.Image.create(
             prompt=prompt,
             n=1
