@@ -77,14 +77,34 @@ class OpenAI:
         if image_url:
             response = requests.get(image_url)
             image_path = rf'''media/{image_url.split('/')[-1]}.png'''
-            image_file = Image.open(BytesIO(response.content)).crop((1024, 1024, 1024, 1024)).save(image_path)
+            image_file = Image.open(BytesIO(response.content))
             
+            width, height = image_file.size
+            if width > height:
+                image_file.crop(
+                    (
+                        width / 2 - height / 2,
+                        0,
+                        width / 2 + height / 2,
+                        height 
+                    )
+                ).save(image_path)
+            else:
+                image_file.crop(
+                    (
+                        0,
+                        height / 2 - width / 2,
+                        width,
+                        height / 2 + width / 2
+                    )
+                ).save(image_path)
+                
             image = openai.Image.create_variation(
                 image=open(image_path, 'rb'),
                 n=1,
             )
             
-            os.remove(image_path)
+            # os.remove(image_path)
             
             return image.data[0]['url']
 
