@@ -23,7 +23,11 @@ bot.users = {}
 dp = Dispatcher(bot)
 
 
-class User(AI.OpenAI, AI.Tesseract):
+class User(
+    AI.OpenAI,
+    AI.Tesseract,
+    AI.NotionAI
+):
     def __init__(self, ai: str, lang_code: str):
         super().__init__(lang_code)
         self.ai = ai
@@ -114,7 +118,8 @@ async def tesseract_callback_query(call: types.CallbackQuery):
     await bot.answer_callback_query(call.id)
 
     text = '''
-Ви вибрали tesseract. Відішліть в цей чат для взаємодії.
+Ви вибрали tesseract. Відішліть фото в цей чат для взаємодії.
+Це нейромережа для сканування тексту з фото
 (Тимчасово доступна тільки Українська мова)
 '''
     await bot.send_message(user_id, text)

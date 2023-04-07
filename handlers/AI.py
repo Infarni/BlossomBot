@@ -1,10 +1,12 @@
+import os
 import requests
 
 import openai
 import pytesseract
 
-from PIL import Image
 from io import BytesIO
+
+from PIL import Image
 
 
 pytesseract.pytesseract.tesseract_cmd = r'/bin/tesseract'
