@@ -77,7 +77,7 @@ class OpenAI:
         if image_url:
             response = requests.get(image_url)
             image_path = rf'''media/{image_url.split('/')[-1]}.png'''
-            image_file = Image.open(BytesIO(response.content)).save(image_path)
+            image_file = Image.open(BytesIO(response.content)).crop((1024, 1024, 1024, 1024)).save(image_path)
             
             image = openai.Image.create_variation(
                 image=open(image_path, 'rb'),
