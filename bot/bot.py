@@ -208,15 +208,15 @@ async def tesseract(message: types.Message):
     user = bot.users[message.from_user.id]
         
     info = await bot.send_message(message.from_id, 'Завантаження...')
-    # try:
-    file = await bot.get_file(message.photo[-1].file_id)
-    image_url = f'https://api.telegram.org/file/bot{bot._token}/{file.file_path}'
-    text = user.scan(image_url)
-    # except:
-    #     await info.delete()
-    #     await bot.send_message(message.from_id, 'Щось сталось не так...')        
+    try:
+        file = await bot.get_file(message.photo[-1].file_id)
+        image_url = f'https://api.telegram.org/file/bot{bot._token}/{file.file_path}'
+        text = user.scan(image_url)
+    except:
+        await info.delete()
+        await bot.send_message(message.from_id, 'Щось сталось не так...')        
         
-    #     return
+        return
 
     await bot.send_message(message.from_id, text)
     await info.delete()
