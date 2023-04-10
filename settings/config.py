@@ -1,0 +1,5 @@
+import sqlite3
+
+TELEGRAM_BOT_TOKEN = '5864396841:AAHcYgVmNA2fa7nIAYunr92o7h6ZJTRGZqo'
+OPENAI_TOKEN = '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'
+DATABASE = sqlite3.connect('db.sqlite3')

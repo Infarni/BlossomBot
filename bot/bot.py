@@ -4,10 +4,11 @@ import sqlite3
 from aiogram import Bot, Dispatcher, types
 from aiogram.utils.callback_data import CallbackData
 
-from handlers.user import User
+from .user import User
+from settings import DATABASE, TELEGRAM_BOT_TOKEN
 
-connection = os.environ['DATABASE']
-cursor = connection.cursor()
+database = DATABASE
+cursor = database.cursor()
 
 class CustomBot(Bot):
     def __init__(self, *args, **kwargs):
@@ -33,7 +34,7 @@ class CustomBot(Bot):
         '''
         cursor.execute(sql)
                 
-        connection.commit()
+        database.commit()
         
         sql = 'SELECT user_id, lang FROM users'
         cursor.execute(sql)
@@ -45,7 +46,7 @@ class CustomBot(Bot):
             self.users[item[0]] = User(item[0], item[1])
 
 
-bot = CustomBot(token=os.environ['TELEGRAM_BOT_TOKEN'], parse_mode='html')
+bot = CustomBot(token=TELEGRAM_BOT_TOKEN, parse_mode='html')
 dp = Dispatcher(bot)
 
 
@@ -207,15 +208,15 @@ async def tesseract(message: types.Message):
     user = bot.users[message.from_user.id]
         
     info = await bot.send_message(message.from_id, 'Завантаження...')
-    try:
-        file = await bot.get_file(message.photo[-1].file_id)
-        image_url = f'https://api.telegram.org/file/bot{bot._token}/{file.file_path}'
-        text = user.scan(image_url)
-    except:
-        await info.delete()
-        await bot.send_message(message.from_id, 'Щось сталось не так...')        
+    # try:
+    file = await bot.get_file(message.photo[-1].file_id)
+    image_url = f'https://api.telegram.org/file/bot{bot._token}/{file.file_path}'
+    text = user.scan(image_url)
+    # except:
+    #     await info.delete()
+    #     await bot.send_message(message.from_id, 'Щось сталось не так...')        
         
-        return
+    #     return
 
     await bot.send_message(message.from_id, text)
     await info.delete()

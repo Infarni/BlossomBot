@@ -1,11 +1,13 @@
 import os
 import sqlite3
 
-from handlers import AI
+import AI
+
+from settings import DATABASE
 
 
-connection = os.environ['DATABASE']
-cursor = connection.cursor()
+database = DATABASE
+cursor = database.cursor()
 
 
 class Messages:
@@ -38,7 +40,7 @@ class Messages:
         sql = 'INSERT INTO messages VALUES (?, ?, ?, ?)'
         cursor.execute(sql, args)
         
-        connection.commit()
+        database.commit()
 
 
 class User(AI.OpenAI, AI.Tesseract):
@@ -53,7 +55,7 @@ class User(AI.OpenAI, AI.Tesseract):
         
         self.messages = Messages(self.user_id)
 
-        connection.commit()
+        database.commit()
     
     def __eq__(self, value):
         return self.mode == value
@@ -63,7 +65,7 @@ class User(AI.OpenAI, AI.Tesseract):
             sql = 'UPDATE users SET mode = ? WHERE user_id = ?'
             cursor.execute(sql, (value, self.user_id))
             
-            connection.commit()
+            database.commit()
         
         self.__dict__[name] = value
     

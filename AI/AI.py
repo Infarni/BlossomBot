@@ -9,9 +9,6 @@ from io import BytesIO
 from PIL import Image
 
 
-pytesseract.pytesseract.tesseract_cmd = r'/bin/tesseract'
-
-
 class OpenAI:
     def __init__(self, lang_code):
         self.messages = []
