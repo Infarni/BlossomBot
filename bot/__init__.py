@@ -1,1 +1,1 @@
-from .bot import dp
+from .bot import dp as Dispatcher

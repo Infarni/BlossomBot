@@ -1,62 +1,29 @@
 import os
-import sqlite3
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.utils.callback_data import CallbackData
 
-from .user import User
-from settings import DATABASE, TELEGRAM_BOT_TOKEN
+from settings import TELEGRAM_BOT_TOKEN
+from AI import OpenAI, Tesseract
+from models import UserModel
 
-database = DATABASE
-cursor = database.cursor()
-
-class CustomBot(Bot):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        
-        sql = '''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER NOT NULL PRIMARY KEY,
-            user_id INTEGER NOT NULL UNIQUE,
-            mode TEXT,
-            lang TEXT NOT NULL
-        )
-        '''
-        cursor.execute(sql)
-                
-        sql = '''
-        CREATE TABLE IF NOT EXISTS messages (
-            id INTEGER NOT NULL PRIMARY KEY,
-            user_id INTEGER NOT NULL,
-            role TEXT NOT NULL,
-            content TEXT NOT NULL
-        )
-        '''
-        cursor.execute(sql)
-                
-        database.commit()
-        
-        sql = 'SELECT user_id, lang FROM users'
-        cursor.execute(sql)
-        
-        fetch = cursor.fetchall()
-
-        self.users = {}
-        for item in fetch:
-            self.users[item[0]] = User(item[0], item[1])
+from .filters import (
+    IsNotRegisterUserFilter,
+    IsRegisterUserFilter,
+    IsChatGPTFilter,
+    IsDalleFilter,
+    IsTesseractFilter
+)
 
 
-bot = CustomBot(token=TELEGRAM_BOT_TOKEN, parse_mode='html')
+bot = Bot(token=TELEGRAM_BOT_TOKEN, parse_mode='html')
 dp = Dispatcher(bot)
+
+ai = CallbackData('ai', 'action')
 
 
 @dp.message_handler(commands=['start'])
 async def start(message: types.Message):
-    user_id = message.from_user.id
-    lang = message.from_user.language_code
-    if not bot.users.get(message.from_user.id):
-        bot.users[user_id] = User(user_id, lang)
-
     text = 'Привіт, це поки не закінчений бот, готуйтесь до багів!'
     await bot.send_message(message.from_id, text)
 
@@ -67,26 +34,43 @@ async def help(message: types.Message):
 Тут поки пустовато але працюють пару команд, наприклад:
 /start - Запуск бота.
 /help - Отримати інструкції по використанню бота.
-/select - Вибрати нейрону мережу
+/register - Зареєструвати користувача.
+/select - Вибрати нейрону мережу.
 '''
     
     await bot.send_message(message.from_id, text)
 
 
-@dp.message_handler(commands=['select'])
+@dp.message_handler(commands=['register'])
+async def register(message: types.Message):
+    user = UserModel.get(message.from_user.id)
+    if not user:
+        UserModel.create(
+            message.from_user.id,
+            message.from_user.language_code
+        )
+        
+        text = 'Ви були успішно зареєстровані.'
+    else:
+        text = 'Ви і так зареєстровані.'
+    
+    await bot.send_message(message.from_id, text)
+
+
+@dp.message_handler(IsRegisterUserFilter(), commands=['select'])
 async def select(message: types.Message):
     markup = types.InlineKeyboardMarkup().add(
         types.InlineKeyboardButton(
             text='chatgpt',
-            callback_data='chatgpt'
+            callback_data=ai.new('chatgpt')
         ),
         types.InlineKeyboardButton(
             text='dall-e',
-            callback_data='dall-e'
+            callback_data=ai.new('dall-e')
         ),
         types.InlineKeyboardButton(
             text='tesseract',
-            callback_data='tesseract'
+            callback_data=ai.new('tesseract')
         )
     )
     
@@ -94,59 +78,32 @@ async def select(message: types.Message):
     await bot.send_message(message.from_id, text, reply_markup=markup)
 
 
-@dp.callback_query_handler(lambda call: call.data == 'chatgpt')
-async def chatgpt_callback_query(call: types.CallbackQuery):
-    user_id = call.from_user.id
-    bot.users[user_id].mode = 'chatgpt'
+@dp.callback_query_handler(ai.filter())
+async def ai_callback_query(call: types.CallbackQuery, callback_data: dict):
+    user = UserModel.get(call.from_user.id)
+    user.mode = callback_data['action']
+    user.save()
 
     await bot.answer_callback_query(call.id)
 
-    text = 'Ви вибрали chatgpt. Пишіть в цей чат для взаємодії.'
-    await bot.send_message(user_id, text)
+    text = f'''Ви вибрали {callback_data['action']}.'''
+    await bot.send_message(call.message.chat.id, text)
 
 
-@dp.callback_query_handler(lambda call: call.data == 'dall-e')
-async def dalle_callback_query(call: types.CallbackQuery):
-    user_id = call.from_user.id
-    bot.users[user_id].mode = 'dall-e'
-
-    await bot.answer_callback_query(call.id)
-
-    text = '''
-Ви вибрали dall-e. Пишіть в цей чат для взаємодії.
-\n\nМайте на увазі що dall-e потребує великий prompt для генерації чогось конкретного
-'''
-    await bot.send_message(user_id, text)
-
-
-@dp.callback_query_handler(lambda call: call.data == 'tesseract')
-async def tesseract_callback_query(call: types.CallbackQuery):
-    user_id = call.from_user.id
-    bot.users[user_id].mode = 'tesseract'
-
-    await bot.answer_callback_query(call.id)
-
-    text = '''
-Ви вибрали tesseract. Відішліть фото в цей чат для взаємодії.
-Це нейромережа для сканування тексту з фото
-(Тимчасово доступна тільки Українська мова)
-'''
-    await bot.send_message(user_id, text)
-
-
-@dp.message_handler(
-    lambda message: bot.users.get(message.from_user.id) == 'chatgpt',
-    content_types=['text']
-)
+@dp.message_handler(IsChatGPTFilter(), content_types=['text'])
 async def chatgpt(message: types.Message):
-    user = bot.users[message.from_user.id]
+    user = UserModel.get(message.from_user.id)
+    
+    user.append_message('user', message.text)
     
     info = await message.reply('Завантаження...')
     
     text = ''
+    assistant_response = ''
     try:
-        for sym in user.chatgpt(message.text):
+        for sym in OpenAI.chatgpt(user.get_messages(), message.text):
             text += sym
+            assistant_response += sym
                 
             if '\n' in sym:
                 await bot.send_message(message.from_id, text)
@@ -158,18 +115,17 @@ async def chatgpt(message: types.Message):
             
         await bot.send_message(message.from_id, text)
         await info.delete()
+        
+        user.append_message('assistant', assistant_response)
     except:
         await bot.send_message(message.from_id, 'Щось сталось не так...')
         await info.delete()
-
-
-@dp.message_handler(
-    lambda message: bot.users.get(message.from_user.id) == 'dall-e',
-    content_types=['text', 'photo']
-)
-async def dalle(message: types.Message):
-    user = bot.users[message.from_user.id]
         
+        user.append_message('system', 'Error')
+
+
+@dp.message_handler(IsDalleFilter(), content_types=['text', 'photo'])
+async def dalle(message: types.Message):
     info = await message.reply('Завантаження...')
             
     try:
@@ -177,14 +133,14 @@ async def dalle(message: types.Message):
             file = await bot.get_file(message.photo[-1].file_id)
             image_url = f'https://api.telegram.org/file/bot{bot._token}/{file.file_path}'
 
-            variation_image_url = user.dalle(image_url=image_url)
-            
+            variation_image_url = OpenAI.dalle(image_url=image_url)
+                    
             await bot.send_photo(message.from_id, variation_image_url)
             await info.delete()
-            
+                    
             return
 
-        image_url = user.dalle(prompt=message.text)
+        image_url = OpenAI.dalle(prompt=message.text)
     except:
         if message.content_type == 'photo':
             text = 'Зображення має бути квадратним та меньшим 4MB'
@@ -200,18 +156,13 @@ async def dalle(message: types.Message):
     await info.delete()
 
 
-@dp.message_handler(
-    lambda message: bot.users.get(message.from_user.id) == 'tesseract',
-    content_types=['photo'],
-)
+@dp.message_handler(IsTesseractFilter(), content_types=['photo'])
 async def tesseract(message: types.Message):
-    user = bot.users[message.from_user.id]
-        
     info = await bot.send_message(message.from_id, 'Завантаження...')
     try:
         file = await bot.get_file(message.photo[-1].file_id)
         image_url = f'https://api.telegram.org/file/bot{bot._token}/{file.file_path}'
-        text = user.scan(image_url)
+        text = Tesseract.scan(image_url=image_url)
     except:
         await info.delete()
         await bot.send_message(message.from_id, 'Щось сталось не так...')        
@@ -222,7 +173,13 @@ async def tesseract(message: types.Message):
     await info.delete()
 
 
-@dp.message_handler()
-async def chat(message: types.Message):
-    text = 'Ви не вибрали нейрону мережу'
+@dp.message_handler(IsNotRegisterUserFilter())
+async def unregistered_user(message: types.Message):
+    text = 'Зареєструйтесь будь ласка.'
+    await bot.send_message(message.from_id, text)
+
+
+@dp.message_handler(IsRegisterUserFilter())
+async def unregistered_mode(message: types.Message):
+    text = 'Виберіть режим будь ласка.'
     await bot.send_message(message.from_id, text)

@@ -1,8 +1,7 @@
 import os
-import requests
 
+import requests
 import openai
-import pytesseract
 
 from io import BytesIO
 
@@ -10,14 +9,11 @@ from PIL import Image
 
 
 class OpenAI:
-    def __init__(self, lang_code):
-        self.messages = []
-
-    def chatgpt(self, prompt):
-        self.messages.append({'role': 'user', 'content': prompt})
+    @staticmethod
+    def chatgpt(messages: list, prompt: str):
         completion = openai.ChatCompletion.create(
             model='gpt-3.5-turbo',
-            messages=self.messages[:],
+            messages=messages,
             stream=True
         )
 
@@ -28,10 +24,9 @@ class OpenAI:
             if content:
                 text += content
                 yield content
-        
-        self.messages.append({'role': 'assistant', 'content': text})
 
-    def dalle(self, prompt='', image_url=None):
+    @staticmethod
+    def dalle(prompt='', image_url=None):
         if image_url:
             response = requests.get(image_url)
             image_path = rf'''media/{image_url.split('/')[-1]}.png'''
@@ -72,13 +67,3 @@ class OpenAI:
         )
 
         return image.data[0]['url']
-
-
-class Tesseract:
-    def scan(self, image_url, lang='ukr'):
-        response = requests.get(image_url)
-        image = Image.open(BytesIO(response.content))
-
-        text = pytesseract.image_to_string(image, lang=lang)
-        
-        return text

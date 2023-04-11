@@ -1,3 +1,4 @@
-from .config import TELEGRAM_BOT_TOKEN
-from .config import OPENAI_TOKEN
-from .config import DATABASE
+from .tokens import TELEGRAM_BOT_TOKEN
+from .tokens import OPENAI_TOKEN
+from .database import DATABASE
+from .database import CURSOR

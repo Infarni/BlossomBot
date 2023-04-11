@@ -7,7 +7,7 @@ import openai
 
 from aiogram import executor
 
-from bot import dp
+from bot import Dispatcher
 from settings import OPENAI_TOKEN
 
 
@@ -16,7 +16,7 @@ def main():
     openai.api_key = OPENAI_TOKEN
 
     executor.start_polling(
-        dp,
+        Dispatcher,
         skip_updates=True,
         timeout=0,
         relax=0,

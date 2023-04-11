@@ -1,1 +1,2 @@
-from .AI import OpenAI, Tesseract
+from .OpenAI import OpenAI
+from .Tesseract import Tesseract
