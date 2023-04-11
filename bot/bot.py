@@ -181,5 +181,5 @@ async def unregistered_user(message: types.Message):
 
 @dp.message_handler(IsRegisterUserFilter())
 async def unregistered_mode(message: types.Message):
-    text = 'Виберіть режим будь ласка.'
+    text = 'Я вас не зрозумів. Переконайтесь що ви вибрали режим та вводите коректні дані.'
     await bot.send_message(message.from_id, text)
