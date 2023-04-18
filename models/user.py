@@ -20,6 +20,22 @@ class UserObject:
         
         DATABASE.commit()
     
+    def __delete_message(self):
+        sql = '''
+        DELETE FROM messages 
+        WHERE user_id = ? 
+        AND id = (
+            SELECT id FROM messages 
+            WHERE user_id = ? 
+            ORDER BY id ASC 
+            LIMIT 1
+        )
+        '''
+        args = (self.user_id, self.user_id)
+        CURSOR.execute(sql, args)
+        
+        DATABASE.commit()
+    
     def save(self):
         sql = '''
         UPDATE users
@@ -50,10 +66,12 @@ class UserObject:
             )
             
         return messages
-    
-    def append_message(self, role: str, content: str):
+
+    def append_message(self, role: str, content: str):  
+        if len(self.get_messages()) > 5:
+            self.__delete_message()
+
         args = (None, self.user_id, role, content)
-        
         sql = 'INSERT INTO messages VALUES (?, ?, ?, ?)'
         CURSOR.execute(sql, args)
         
