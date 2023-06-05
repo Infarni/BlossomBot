@@ -1,24 +1,65 @@
+from datetime import datetime, timedelta
+
 from settings import DATABASE, CURSOR
 
 
 class UserObject:
     def __init__(
         self,
-        user_id:int,
+        user_id: int,
         lang: str,
-        mode: str=None,
-        id: int=None
+        mode: str = None,
+        id: int = None,
+        uses: int = 0,
+        premium: bool = False,
+        subscribe_date: datetime = None
     ):
         self.id = id
         self.user_id = user_id
         self.mode = mode
         self.lang = lang
-        
-        sql = '''INSERT OR IGNORE INTO users VALUES (?, ?, ?, ?)'''
-        args = (id, user_id, mode, lang)
+        self.uses = uses
+        self.subscribe_date = subscribe_date
+
+        sql = '''INSERT OR IGNORE INTO users VALUES (?, ?, ?, ?, ?, ?)'''
+        args = (id, user_id, mode, lang, uses, subscribe_date)
         CURSOR.execute(sql, args)
         
         DATABASE.commit()
+    
+    def __check_uses(self):
+        if self.premium:
+            return True
+
+        sql = 'SELECT uses FROM users WHERE user_id = ?'
+        args = (self.user_id,)
+        CURSOR.execute(sql, args)
+        
+        fetch = CURSOR.fetchone()[0]
+        
+        return fetch <= 5
+    
+    def __check_subscribe_date(self):
+        sql = 'SELECT subscribe_date FROM users WHERE user_id = ?'
+        args = (self.user_id,)
+        CURSOR.execute(sql, args)
+        
+        fetch = CURSOR.fetchall()[0][0]
+        
+        if fetch is None:
+            return None
+
+        date = datetime.strptime(fetch, '%Y-%m-%d %H:%M:%S.%f')
+        
+        return date
+
+    def __check_premium(self):
+        if self.subscribe_date is None:
+            return False
+
+        date = (self.subscribe_date + timedelta(days=30)).date()
+        
+        return datetime.now().date() < date
     
     def __delete_message(self):
         sql = '''
@@ -36,6 +77,37 @@ class UserObject:
         
         DATABASE.commit()
     
+    def __getattribute__(self, name):
+        if name == 'uses':
+            return self.__check_uses()
+        elif name == 'subscribe_date':
+            return self.__check_subscribe_date()
+        elif name == 'premium':
+            return self.__check_premium()
+        
+        return super().__getattribute__(name)
+    
+    def update_subscribe_date(self, value: datetime):
+        sql = 'UPDATE users SET subscribe_date = ? WHERE user_id = ?'
+        args = (value, self.user_id)
+        CURSOR.execute(sql, args)
+        
+        DATABASE.commit()
+    
+    def append_use(self):
+        sql = '''
+        UPDATE users
+        SET
+            uses = ?
+        WHERE user_id = ?
+        '''
+        args = (self.uses + 1, self.user_id)
+        CURSOR.execute(sql, args)
+        
+        DATABASE.commit()
+        
+        self.uses += 1
+    
     def save(self):
         sql = '''
         UPDATE users
@@ -43,9 +115,19 @@ class UserObject:
             id = ?,
             user_id = ?,
             mode = ?,
-            lang = ?
+            lang = ?,
+            uses = ?,
+            subscribe_date = ?
         WHERE user_id = ?'''
-        args = (self.id, self.user_id, self.mode, self.lang, self.user_id)
+        args = (
+            self.id,
+            self.user_id,
+            self.mode,
+            self.lang,
+            self.uses,
+            self.subscribe_date,
+            self.user_id
+        )
         CURSOR.execute(sql, args)
         
         DATABASE.commit()
@@ -67,7 +149,7 @@ class UserObject:
             
         return messages
 
-    def append_message(self, role: str, content: str):  
+    def append_message(self, role: str, content: str):
         if len(self.get_messages()) > 5:
             self.__delete_message()
 
@@ -105,7 +187,7 @@ class UserModel:
                 UserObject(
                     user_id=item[1],
                     mode=item[2],
-                    lang=item[3]
+                    lang=item[3],
                 )
             )
         
@@ -113,7 +195,7 @@ class UserModel:
 
     @staticmethod
     def get(user_id: int) -> UserObject | None:
-        sql = 'SELECT id, user_id, mode, lang FROM users WHERE user_id = ?'
+        sql = 'SELECT * FROM users WHERE user_id = ?'
         args = (user_id,)
         CURSOR.execute(sql, args)
         
@@ -126,7 +208,9 @@ class UserModel:
             id=fetch[0],
             user_id=fetch[1],
             mode=fetch[2],
-            lang=fetch[3]
+            lang=fetch[3],
+            uses=fetch[4],
+            subscribe_date=fetch[5]
         )
     
     @staticmethod

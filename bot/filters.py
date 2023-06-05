@@ -2,6 +2,14 @@ from aiogram import types
 from aiogram.dispatcher.filters import Filter
 
 from models import UserModel
+from settings import OWNER_ID
+
+
+class IsAdminFilter(Filter):
+    key = 'is_admin'
+    
+    async def check(self, message: types.Message):
+        return message.from_user.id == OWNER_ID
 
 
 class IsNotRegisterUserFilter(Filter):
@@ -31,6 +39,11 @@ class IsAICheck(Filter):
         return False
 
 
+class IsSubscribeFilter(IsAICheck):
+    key = 'is_mode_subscribe'
+    ai = 'subscribe'
+
+
 class IsChatGPTFilter(IsAICheck):
     key = 'is_mode_chatgpt'
     ai = 'chatgpt'
@@ -44,3 +57,8 @@ class IsDalleFilter(IsAICheck):
 class IsTesseractFilter(IsAICheck):
     key = 'is_mode_tesseract'
     ai = 'tesseract'
+
+
+class IsSpeechRecognition(IsAICheck):
+    key = 'is_mode_speech_recognition'
+    ai = 'speech_recognition'

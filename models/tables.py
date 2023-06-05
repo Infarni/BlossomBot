@@ -7,11 +7,13 @@ def init():
         id INTEGER NOT NULL PRIMARY KEY,
         user_id INTEGER NOT NULL UNIQUE,
         mode TEXT,
-        lang TEXT NOT NULL
+        lang TEXT NOT NULL,
+        uses INTEGER DEFAULT 0,
+        subscribe_date timestamp
     )
     '''
     CURSOR.execute(sql)
-    
+
     sql = '''
     CREATE TABLE IF NOT EXISTS messages (
         id INTEGER NOT NULL PRIMARY KEY,
@@ -21,5 +23,5 @@ def init():
     )
     '''
     CURSOR.execute(sql)
-                    
+
     DATABASE.commit()
