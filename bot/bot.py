@@ -316,7 +316,8 @@ async def speech_recognition(message: types.Message):
         os.remove(voice_wav_path)
 
         user.append_use()
-    except Exception:
+    except Exception as ex:
+        raise ex
         await info.delete()
         await bot.send_message(message.from_id, 'Щось сталось не так')
 
