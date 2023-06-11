@@ -1,7 +1,5 @@
 #!/bin/env python3
-import os
 import logging
-import sqlite3
 
 import openai
 

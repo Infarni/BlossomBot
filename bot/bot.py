@@ -37,14 +37,13 @@ permit_request = CallbackData('permit_request', 'action')
 
 @dp.message_handler(commands=['start'])
 async def start(message: types.Message):
-    text = 'Привіт, це поки не закінчений бот, готуйтесь до багів!'
+    text = 'Привіт, це бот створений для взаємодії з нейроними мережами. Для допомоги скористуйтеся командою /help!'
     await bot.send_message(message.from_id, text)
 
 
 @dp.message_handler(commands=['help'])
 async def help(message: types.Message):
     text = '''
-Тут поки пустовато але працюють пару команд, наприклад:
 /start - Запуск бота
 /help - Отримати інструкції по використанню бота
 /register - Зареєструвати користувача
